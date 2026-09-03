@@ -1,4 +1,4 @@
-
+import EvaluationInput from "@/components/EvaluationInput";
 
 export default function Home() {
   return (
@@ -24,9 +24,7 @@ export default function Home() {
             </button>
           </nav>
           <main>
-           <p className="text-center text-gray-600 mt-12">
-             ここにメインコンテンツが表示されます
-           </p>
+            <EvaluationInput />
           </main>
       </div>
   );
