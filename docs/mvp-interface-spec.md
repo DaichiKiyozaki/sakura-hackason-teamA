@@ -502,7 +502,7 @@ interview_id,evaluation_item_id,score,reason
 - Python標準の `csv` モジュールと `csv.QUOTE_MINIMAL` を使用する。
 - ファイルは `encoding="utf-8"`、`newline=""` で読み書きする。内部DB用であり、利用者にはExcelを出力するためBOMは付けない。
 - 回答、理由、所感に含まれるカンマ、ダブルクォート、改行は `csv` モジュールにエスケープさせる。
-- 現在の `data/*.csv` には動作確認用の仮レコード5件を格納している。動作確認で追加したレコードは原則としてコミットしない。
+- 動作確認用のJSONとCSVは `test_data/` に格納する。実行時に `data/*.csv` へ追加されたレコードはコミットしない。
 
 ## 8. HTTPステータス
 
@@ -528,6 +528,11 @@ sakura-hackason-teamA/
 │   ├── excel.py              # Excelファイル生成
 │   └── requirements.txt      # Python依存パッケージ
 ├── data/                     # DB（CSV）
+│   ├── interviews.csv
+│   ├── question_answers.csv
+│   └── evaluations.csv
+├── test_data/                # API・CSV処理の動作確認用データ
+│   ├── save_interview_request.json
 │   ├── interviews.csv
 │   ├── question_answers.csv
 │   └── evaluations.csv
