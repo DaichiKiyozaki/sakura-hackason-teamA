@@ -517,7 +517,8 @@ interview_id,evaluation_item_id,score,reason
 | --- | --- | --- |
 | `400 Bad Request` | 必須項目の不足、話者ラベル不正、評価5項目の不足・重複、評価点の範囲外 | 入力内容を確認してください |
 | `404 Not Found` | 指定した面接記録が存在しない | 面接記録が見つかりません |
-| `500 Internal Server Error` | 分割・要約、保存、Excel出力の失敗 | 処理に失敗しました |
+| `500 Internal Server Error` | OllamaのJSON解析、DB保存、Excel出力などバックエンド内部の処理失敗 | 処理に失敗しました |
+| `502 Bad Gateway` | バックエンドからOllamaへの接続失敗・接続タイムアウト | Ollamaに接続できませんでした |
 
 ## 9. ディレクトリ構成
 
