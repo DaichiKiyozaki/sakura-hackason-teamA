@@ -7,7 +7,7 @@
         ↓
 質問と回答に分割し、回答を短く要約
         ↓
-面接官が5項目を評価
+面接官が4項目を評価
         ↓
 保存またはExcel出力
 ```
@@ -50,7 +50,7 @@ sequenceDiagram
     Front-->>User: 結果と評価入力欄を表示
 
     Note over User, DB: フェーズ2　評価入力・保存
-    User->>Front: 5項目の評価点・理由・全体所感を入力し、保存ボタンを押す
+    User->>Front: 4項目の評価点・理由・全体所感を入力し、保存ボタンを押す
     Front->>API: POST /api/interviews（面接内容＋評価内容）
     API->>DB: 面接IDを発行して記録を保存
     DB-->>API: 保存結果を返す
@@ -84,11 +84,10 @@ type QuestionAnswer = {
 };
 
 type EvaluationItemId =
-  | "communication"
   | "logical_thinking"
-  | "problem_solving"
-  | "initiative"
-  | "collaboration";
+  | "communication"
+  | "collaboration"
+  | "enthusiasm";
 
 type EvaluationResult = {
   evaluationItemId: EvaluationItemId;
@@ -189,19 +188,18 @@ OllamaにはJSON形式での出力を指定し、次の形だけを受け付け�
 | INPUT | 全体の所感 | `overallComment` | `string` | 任意 | ユーザー → フロント |
 | OUTPUT | 入力された評価内容 | `evaluationResults` | `EvaluationResult[]` | - | タスク3へ渡す |
 
-「入力された評価内容」は、5項目それぞれの評価点と任意の評価理由をまとめたものを指す。
+「入力された評価内容」は、4項目それぞれの評価点と任意の評価理由をまとめたものを指す。
 
 #### MVPの評価項目
 
 | 固定ID | 評価項目 | 観点 |
 | --- | --- | --- |
-| `communication` | コミュニケーション力 | 質問を理解し、分かりやすく回答できているか |
-| `logical_thinking` | 論理的思考力 | 結論と理由を筋道立てて説明できているか |
-| `problem_solving` | 問題解決力 | 課題を整理し、解決策を考えられるか |
-| `initiative` | 主体性 | 自ら考え、行動する姿勢があるか |
+| `logical_thinking` | 論理性 | 結論と理由を筋道立てて説明できているか |
+| `communication` | コミュニケーション能力 | 質問を理解し、分かりやすく回答できているか |
 | `collaboration` | 協調性 | 周囲と協力して行動できるか |
+| `enthusiasm` | 熱意 | 志望意欲や入社後に取り組む姿勢が感じられるか |
 
-5つの固定IDを重複なくすべて送る。欠落、重複、1～5以外の評価点がある場合は `400 Bad Request` とする。
+4つの固定IDを重複なくすべて送る。欠落、重複、1～5以外の評価点がある場合は `400 Bad Request` とする。
 
 ### タスク3：保存・Excel出力
 
@@ -374,11 +372,10 @@ const nextConfig: NextConfig = {
     }
   ],
   "evaluationResults": [
-    { "evaluationItemId": "communication", "score": 4, "reason": "任意の理由" },
     { "evaluationItemId": "logical_thinking", "score": 3 },
-    { "evaluationItemId": "problem_solving", "score": 4 },
-    { "evaluationItemId": "initiative", "score": 5 },
-    { "evaluationItemId": "collaboration", "score": 4 }
+    { "evaluationItemId": "communication", "score": 4, "reason": "任意の理由" },
+    { "evaluationItemId": "collaboration", "score": 4 },
+    { "evaluationItemId": "enthusiasm", "score": 5 }
   ],
   "overallComment": "全体の所感"
 }
@@ -393,7 +390,7 @@ const nextConfig: NextConfig = {
 }
 ```
 
-- `evaluationResults` は5つの固定IDを重複なくすべて含める。
+- `evaluationResults` は4つの固定IDを重複なくすべて含める。
 - MVPでは追記のみとし、保存済み記録の更新・削除は行わない。保存完了後は保存ボタンを無効にする。
 
 ### `GET /api/interviews/{interviewId}/excel`
@@ -511,7 +508,7 @@ interview_id,evaluation_item_id,score,reason
 
 | HTTPステータス | 用途 | 画面表示例 |
 | --- | --- | --- |
-| `400 Bad Request` | 必須項目の不足、話者ラベル不正、評価5項目の不足・重複、評価点の範囲外 | 入力内容を確認してください |
+| `400 Bad Request` | 必須項目の不足、話者ラベル不正、評価4項目の不足・重複、評価点の範囲外 | 入力内容を確認してください |
 | `404 Not Found` | 指定した面接記録が存在しない | 面接記録が見つかりません |
 | `500 Internal Server Error` | OllamaのJSON解析、DB保存、Excel出力などバックエンド内部の処理失敗 | 処理に失敗しました |
 | `502 Bad Gateway` | バックエンドからOllamaへの接続失敗・接続タイムアウト | Ollamaに接続できませんでした |

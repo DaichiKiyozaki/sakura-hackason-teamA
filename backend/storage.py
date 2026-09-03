@@ -56,6 +56,14 @@ EVALUATIONS = Table(
     ),
 )
 
+# フロントエンドとAPIで共通して使用する評価観点ID。
+EVALUATION_ITEM_IDS = (
+    "logical_thinking",
+    "communication",
+    "collaboration",
+    "enthusiasm",
+)
+
 
 class StorageError(Exception):
     """CSVの読み込みに失敗した。"""
