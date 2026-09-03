@@ -24,7 +24,7 @@ AIは質問・回答の分割と回答の要約にだけ使用し、評価や合
 | 担当 | 役割 |
 | --- | --- |
 | フロントエンド | 入力画面、結果表示、評価入力、Excelダウンロード |
-| バックエンド（FastAPI） | フロントからデータを受け取り、Ollama・DB（CSV）との連携とExcel生成を行う |
+| バックエンド（FastAPI） | 現在の `main.py` はExcelダウンロードAPIを提供し、`storage.py` でDB（CSV）を読み込み、`excel.py` でpandasによるExcel生成を行う |
 | Ollama | 質問・回答の分割、回答ごとの要約 |
 | DB（CSV） | 面接記録の内部保存 |
 
@@ -43,7 +43,7 @@ sequenceDiagram
 
     Note over User, DB: フェーズ1　分割・要約
     User->>Front: 面接日・候補者名・文字起こしを入力し、分割・要約ボタンを押す
-    Front->>API: POST /api/analyze（文字起こし）
+    Front->>API: POST /api/analyze
     API->>LLM: 質問・回答の分割と回答要約を依頼
     LLM-->>API: 質問・回答・回答要約（JSON）
     API-->>Front: questionAnswers を返す
@@ -226,11 +226,11 @@ OllamaにはJSON形式での出力を指定し、次の形だけを受け付け�
 | 区分 | データ | 変数名（仮） | 型 | 必須 | 担当 |
 | --- | --- | --- | --- | --- | --- |
 | INPUT | 保存済みの面接ID | `interviewId` | `string` | 必須 | フロント → バックエンド |
-| OUTPUT | 候補者の面接結果 | `excelFile` | `Blob (.xlsx)` | - | バックエンド → ユーザー |
+| OUTPUT | 候補者の面接記録 | `excelFile` | `Blob (.xlsx)` | - | バックエンド → ユーザー |
 
 - 1回の面接（候補者1名）につき1ファイル出力する。
 - 同じ候補者の別日面接と区別するため、ファイル名に候補者名と面接日を含める。
-- ファイル名例：`面接評価_応募者A_20260903.xlsx`
+- ファイル名例：`面接記録_応募者A_20260903.xlsx`
 - 未保存の内容はExcel出力しない。
 
 ### タスク4：過去記録の表示・比較（できれば対応）
@@ -357,7 +357,7 @@ const nextConfig: NextConfig = {
 
 ### `POST /api/interviews`
 
-面接内容と評価内容を受け取り、面接IDを発行してDB（CSV）へ記録する。
+面接内容と評価内容を受け取る。`main.py` で入力を検証し、`storage.py` で面接IDを発行してDB（CSV）へ記録する。
 
 リクエスト：
 
@@ -398,7 +398,7 @@ const nextConfig: NextConfig = {
 
 ### `GET /api/interviews/{interviewId}/excel`
 
-保存済みの面接記録からExcelファイルを生成して返す。レスポンスはJSONではなくファイル本体とする。
+`storage.py` の `select()` で保存済みの面接記録を読み込み、`excel.py` でExcelファイルを生成して返す。レスポンスはJSONではなくファイル本体とする。
 
 | ヘッダー | 値 |
 | --- | --- |
@@ -453,16 +453,18 @@ Ollamaは音声入力に対応しないため、実装する場合は文字起�
 
 Excelは1ファイル・1シートとする。
 
-シート名：`面接評価`
+シート名：`面接記録`
 
-シート内を上から次の3区画に分ける。
+Excelは利用者向けの面接記録とし、内部管理用の面接IDと評価内容は出力しない。
+表データはpandasで作成し、`.xlsx` の書き込みエンジンとセルの装飾にはopenpyxlを使用する。
+
+シート内を上から次の2区画に分ける。
 
 ### ① 基本情報
 
 ```text
-面接ID
 面接日
-候補者名・識別名
+候補者名
 全体の所感
 ```
 
@@ -470,17 +472,9 @@ Excelは1ファイル・1シートとする。
 
 1つの質問・回答につき1行とする。
 
-| 質問番号 | 質問 | 回答 | 回答要約 |
-| --- | --- | --- | --- |
-| 1 | 志望理由を教えてください | 回答全文 | 回答の短い要約 |
-
-### ③ 評価内容
-
-1つの評価項目につき1行とする。
-
-| 評価項目 | 評価点 | 評価理由 |
-| --- | --- | --- |
-| コミュニケーション力 | 4 | 任意の理由 |
+| 質問 | 回答（要約） |
+| --- | --- |
+| 志望理由を教えてください | 回答の短い要約 |
 
 ## 7. DB（CSV）の分割
 
@@ -506,10 +500,12 @@ interview_id,evaluation_item_id,score,reason
 
 評価項目の日本語表示名は固定IDから変換する。3ファイルは `interview_id` で関連付ける。作成日時や更新日時などのメタ情報はMVPでは保存しない。
 
+データアクセスは `storage.py` に集約し、`main.py` やほかの処理からCSVを直接操作しない。将来CSVからデータベースへ移行する場合に呼び出し側を大きく変更せずに済むよう、SQLライクなインターフェースを介してデータを操作する。
+
 - Python標準の `csv` モジュールと `csv.QUOTE_MINIMAL` を使用する。
 - ファイルは `encoding="utf-8"`、`newline=""` で読み書きする。内部DB用であり、利用者にはExcelを出力するためBOMは付けない。
 - 回答、理由、所感に含まれるカンマ、ダブルクォート、改行は `csv` モジュールにエスケープさせる。
-- `data/*.csv` は実行時データのためGitへコミットしない。
+- 現在の `data/*.csv` には動作確認用の仮レコード5件を格納している。動作確認で追加したレコードは原則としてコミットしない。
 
 ## 8. HTTPステータス
 
@@ -522,24 +518,24 @@ interview_id,evaluation_item_id,score,reason
 
 ## 9. ディレクトリ構成
 
-現在は `frontend` のみ作成済みで、それ以外は実装時に追加する。
+現在の `main.py` はExcelダウンロードに必要な最小構成。`storage.py` と `excel.py` は作成済みで、その他のAPIは担当者が統合時に追加する。
 
 ```text
 sakura-hackason-teamA/
 ├── frontend/
 │   └── app/                  # 入力・評価・出力画面
 ├── backend/
-│   ├── main.py               # FastAPIの起動と受付処理
+│   ├── main.py               # FastAPI起動・ExcelダウンロードAPI
 │   ├── llm.py                # Ollamaによる分割・要約
-│   ├── storage.py            # DB（CSV）への保存・読み込み
-│   └── excel.py              # Excelファイル生成
+│   ├── storage.py            # DB（CSV）のテーブル定義・読み込み
+│   ├── excel.py              # Excelファイル生成
+│   └── requirements.txt      # Python依存パッケージ
 ├── data/                     # DB（CSV）
 │   ├── interviews.csv
 │   ├── question_answers.csv
 │   └── evaluations.csv
 ├── docs/
 │   └── mvp-interface-spec.md
-├── tests/                    # 最低限のテスト
-├── .gitignore                # data/*.csvをGit管理外にする
+├── .gitignore                # 仮想環境やデバッグ出力をGit管理外にする
 └── README.md
 ```
