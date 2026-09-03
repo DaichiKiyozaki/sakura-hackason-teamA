@@ -1,27 +1,31 @@
-"""
-main.py（抜粋：/api/analyze エンドポイント）
-
-storage.py, excel.py の担当者が実装するエンドポイントは
-このファイルに合流させる想定（仕様書 9章のディレクトリ構成）。
-"""
+"""面接評価支援システムのバックエンドAPI。"""
 
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+import re
+from datetime import date
+from enum import Enum
+from urllib.parse import quote
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field, model_validator
 
 from llm import analyze_transcript
 
-from urllib.parse import quote
-
 from excel import create_excel_filename, create_interview_excel
 from storage import (
+    EVALUATIONS,
+    EVALUATION_ITEM_IDS,
     INTERVIEWS,
     QUESTION_ANSWERS,
     InterviewNotFoundError,
     StorageError,
+    insert,
     select,
+    select_max,
 )
 
 app = FastAPI(title="面接評価支援システム")
@@ -49,12 +53,67 @@ class QuestionAnswer(CamelModel):
     answer_summary: str
 
 
+class EvaluationItemId(str, Enum):
+    LOGICAL_THINKING = "logical_thinking"
+    COMMUNICATION = "communication"
+    COLLABORATION = "collaboration"
+    ENTHUSIASM = "enthusiasm"
+
+
+class EvaluationResult(CamelModel):
+    evaluation_item_id: EvaluationItemId
+    score: int = Field(ge=1, le=5)
+    reason: str | None = None
+
+
 class AnalyzeRequest(CamelModel):
     transcript: str
 
 
 class AnalyzeResponse(CamelModel):
     question_answers: list[QuestionAnswer]
+
+
+class SaveInterviewRequest(CamelModel):
+    interview_date: date
+    candidate_name: str = Field(min_length=1)
+    question_answers: list[QuestionAnswer] = Field(min_length=1)
+    evaluation_results: list[EvaluationResult] = Field(min_length=4, max_length=4)
+    overall_comment: str | None = None
+
+    @model_validator(mode="after")
+    def validate_numbering_and_evaluations(self) -> SaveInterviewRequest:
+        question_numbers = [item.question_no for item in self.question_answers]
+        expected_numbers = list(range(1, len(self.question_answers) + 1))
+        if question_numbers != expected_numbers:
+            raise ValueError("questionNoは1から始まる連番にしてください")
+
+        item_ids = {item.evaluation_item_id.value for item in self.evaluation_results}
+        if item_ids != set(EVALUATION_ITEM_IDS):
+            raise ValueError("4つの評価項目を重複なく指定してください")
+
+        return self
+
+
+class SaveInterviewResponse(CamelModel):
+    interview_id: str
+    save_status: bool
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(
+    request: Request,
+    error: RequestValidationError,
+) -> JSONResponse:
+    """保存APIの入力エラーをAPI仕様どおり400で返す。"""
+
+    if request.url.path != "/api/interviews":
+        return await request_validation_exception_handler(request, error)
+
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "入力内容を確認してください"},
+    )
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse, response_model_by_alias=True)
@@ -67,9 +126,84 @@ def analyze(req: AnalyzeRequest):
     return AnalyzeResponse(question_answers=question_answers)
 
 
+def _interview_id_number(interview_id: str) -> int:
+    """INT-0001形式のIDから採番用の数値を取り出す。"""
+
+    match = re.fullmatch(r"INT-(\d+)", interview_id)
+    return int(match.group(1)) if match else 0
+
+
+def _next_interview_id() -> str:
+    """既存IDの最大番号に1を足して新しい面接IDを発行する。"""
+
+    latest_id = select_max(
+        INTERVIEWS,
+        "interview_id",
+        key=_interview_id_number,
+    )
+    maximum = _interview_id_number(latest_id) if latest_id else 0
+    return f"INT-{maximum + 1:04d}"
+
+
+@app.post(
+    "/api/interviews",
+    response_model=SaveInterviewResponse,
+    response_model_by_alias=True,
+)
+def save_interview(req: SaveInterviewRequest) -> SaveInterviewResponse:
+    """面接内容と評価内容をCSVへ保存する。"""
+
+    try:
+        interview_id = _next_interview_id()
+        interview = req.model_dump(mode="json")
+
+        insert(
+            INTERVIEWS,
+            {
+                "interview_id": interview_id,
+                "interview_date": interview["interview_date"],
+                "candidate_name": interview["candidate_name"],
+                "overall_comment": interview["overall_comment"] or "",
+            },
+        )
+        insert(
+            QUESTION_ANSWERS,
+            [
+                {
+                    "interview_id": interview_id,
+                    "question_no": item["question_no"],
+                    "question": item["question"],
+                    "answer": item["answer"],
+                    "answer_summary": item["answer_summary"],
+                }
+                for item in interview["question_answers"]
+            ],
+        )
+        insert(
+            EVALUATIONS,
+            [
+                {
+                    "interview_id": interview_id,
+                    "evaluation_item_id": item["evaluation_item_id"],
+                    "score": item["score"],
+                    "reason": item["reason"] or "",
+                }
+                for item in interview["evaluation_results"]
+            ],
+        )
+    except (StorageError, KeyError, TypeError, ValueError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail="面接記録の保存に失敗しました",
+        ) from error
+
+    return SaveInterviewResponse(interview_id=interview_id, save_status=True)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 EXCEL_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 

@@ -515,16 +515,16 @@ interview_id,evaluation_item_id,score,reason
 
 ## 9. ディレクトリ構成
 
-現在の `main.py` はExcelダウンロードに必要な最小構成。`storage.py` と `excel.py` は作成済みで、その他のAPIは担当者が統合時に追加する。
+`main.py` はAPI受付と入力検証、`storage.py` はCSVへのデータアクセス、`excel.py` はExcel生成を担当する。
 
 ```text
 sakura-hackason-teamA/
 ├── frontend/
 │   └── app/                  # 入力・評価・出力画面
 ├── backend/
-│   ├── main.py               # FastAPI起動・ExcelダウンロードAPI
+│   ├── main.py               # FastAPI起動・API受付・入力検証
 │   ├── llm.py                # Ollamaによる分割・要約
-│   ├── storage.py            # DB（CSV）のテーブル定義・読み込み
+│   ├── storage.py            # DB（CSV）のテーブル定義・読み書き
 │   ├── excel.py              # Excelファイル生成
 │   └── requirements.txt      # Python依存パッケージ
 ├── data/                     # DB（CSV）
