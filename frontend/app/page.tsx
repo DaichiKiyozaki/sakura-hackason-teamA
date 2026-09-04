@@ -12,20 +12,9 @@ export default function Home() {
           </p>
         </header>
 
-          <nav className="flex justify-center gap-12 mt-8">
-            <button className="text-gray-500 hover:text-gray-700">
-              評価入力
-            </button>
-            <button className="text-gray-500 hover:text-gray-700">
-              一覧・検索・比較
-            </button>
-            <button className="text-gray-500 hover:text-gray-700">
-              Excel出力
-            </button>
-          </nav>
           <main>
-            <EvaluationInput />
+            <EvaluationInput/>
           </main>
       </div>
-  );
-}
+    );
+  }
