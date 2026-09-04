@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 from llm import analyze_transcript
 
@@ -21,10 +21,8 @@ from storage import (
     EVALUATION_ITEM_IDS,
     INTERVIEWS,
     QUESTION_ANSWERS,
-    InterviewNotFoundError,
     StorageError,
     insert,
-    select,
     select_max,
 )
 
@@ -54,10 +52,11 @@ class QuestionAnswer(CamelModel):
 
 
 class EvaluationItemId(str, Enum):
-    LOGICAL_THINKING = "logical_thinking"
     COMMUNICATION = "communication"
+    PROBLEM_SOLVING = "problem_solving"
+    LOGICAL_THINKING = "logical_thinking"
+    INITIATIVE = "initiative"
     COLLABORATION = "collaboration"
-    ENTHUSIASM = "enthusiasm"
 
 
 class EvaluationResult(CamelModel):
@@ -74,11 +73,32 @@ class AnalyzeResponse(CamelModel):
     question_answers: list[QuestionAnswer]
 
 
-class SaveInterviewRequest(CamelModel):
+class ExportInterviewRequest(CamelModel):
     interview_date: date
     candidate_name: str = Field(min_length=1)
     question_answers: list[QuestionAnswer] = Field(min_length=1)
-    evaluation_results: list[EvaluationResult] = Field(min_length=4, max_length=4)
+    overall_comment: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("overallComment", "overallcomment"),
+    )
+
+    @model_validator(mode="after")
+    def validate_question_numbering(self) -> ExportInterviewRequest:
+        question_numbers = [item.question_no for item in self.question_answers]
+        expected_numbers = list(range(1, len(self.question_answers) + 1))
+        if question_numbers != expected_numbers:
+            raise ValueError("questionNoは1から始まる連番にしてください")
+
+        return self
+
+
+class SaveInterviewRequest(CamelModel):
+    """将来DB保存を再びAPIへ組み込む場合に使用する入力モデル。"""
+
+    interview_date: date
+    candidate_name: str = Field(min_length=1)
+    question_answers: list[QuestionAnswer] = Field(min_length=1)
+    evaluation_results: list[EvaluationResult] = Field(min_length=5, max_length=5)
     overall_comment: str | None = None
 
     @model_validator(mode="after")
@@ -90,7 +110,7 @@ class SaveInterviewRequest(CamelModel):
 
         item_ids = {item.evaluation_item_id.value for item in self.evaluation_results}
         if item_ids != set(EVALUATION_ITEM_IDS):
-            raise ValueError("4つの評価項目を重複なく指定してください")
+            raise ValueError("5つの評価項目を重複なく指定してください")
 
         return self
 
@@ -105,7 +125,7 @@ async def request_validation_error_handler(
     request: Request,
     error: RequestValidationError,
 ) -> JSONResponse:
-    """保存APIの入力エラーをAPI仕様どおり400で返す。"""
+    """Excel出力APIの入力エラーをAPI仕様どおり400で返す。"""
 
     if request.url.path != "/api/interviews":
         return await request_validation_exception_handler(request, error)
@@ -126,6 +146,7 @@ def analyze(req: AnalyzeRequest):
     return AnalyzeResponse(question_answers=question_answers)
 
 
+# 現行APIからは呼び出さないが、将来DB保存を再導入できるよう処理を保持する。
 def _interview_id_number(interview_id: str) -> int:
     """INT-0001形式のIDから採番用の数値を取り出す。"""
 
@@ -145,13 +166,8 @@ def _next_interview_id() -> str:
     return f"INT-{maximum + 1:04d}"
 
 
-@app.post(
-    "/api/interviews",
-    response_model=SaveInterviewResponse,
-    response_model_by_alias=True,
-)
-def save_interview(req: SaveInterviewRequest) -> SaveInterviewResponse:
-    """面接内容と評価内容をCSVへ保存する。"""
+def save_interview_to_storage(req: SaveInterviewRequest) -> SaveInterviewResponse:
+    """面接内容と評価内容をCSVへ保存する。現行APIからは未使用。"""
 
     try:
         interview_id = _next_interview_id()
@@ -192,10 +208,7 @@ def save_interview(req: SaveInterviewRequest) -> SaveInterviewResponse:
             ],
         )
     except (StorageError, KeyError, TypeError, ValueError) as error:
-        raise HTTPException(
-            status_code=500,
-            detail="面接記録の保存に失敗しました",
-        ) from error
+        raise StorageError("面接記録の保存に失敗しました") from error
 
     return SaveInterviewResponse(interview_id=interview_id, save_status=True)
 
@@ -208,35 +221,14 @@ def health():
 EXCEL_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
-@app.get("/api/interviews/{interview_id}/excel")
-def download_interview_excel(interview_id: str) -> StreamingResponse:
-    """保存済みの面接記録をExcelに変換して返す。"""
+@app.post("/api/interviews")
+def export_interview_excel(req: ExportInterviewRequest) -> StreamingResponse:
+    """入力された面接記録を保存せず、Excelに変換して返す。"""
 
     try:
-        interviews = select(
-            INTERVIEWS,
-            ("interview_date", "candidate_name", "overall_comment"),
-            interview_id=interview_id,
-        )
-        if not interviews:
-            raise InterviewNotFoundError(interview_id)
-
-        question_answers = select(
-            QUESTION_ANSWERS,
-            ("question_no", "question", "answer_summary"),
-            interview_id=interview_id,
-        )
-        question_answers.sort(key=lambda item: int(item["question_no"]))
-
-        interview = {
-            **interviews[0],
-            "question_answers": question_answers,
-        }
-        # Excelはディスクへ保存せず、メモリ上のBytesIOとして受け取る。
+        interview = req.model_dump(mode="json")
         excel_file = create_interview_excel(interview)
-    except InterviewNotFoundError as error:
-        raise HTTPException(status_code=404, detail="面接記録が見つかりません") from error
-    except (StorageError, OSError, KeyError, ValueError) as error:
+    except (OSError, KeyError, TypeError, ValueError) as error:
         raise HTTPException(status_code=500, detail="Excel出力に失敗しました") from error
 
     # 日本語ファイル名をHTTPヘッダーで安全に返せるようURLエンコードする。

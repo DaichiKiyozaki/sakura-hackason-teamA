@@ -22,9 +22,9 @@ _THIN_BORDER = Border(
 
 
 def create_interview_excel(interview: Mapping[str, Any]) -> BytesIO:
-    """面接1件を、仕様書どおり1シートのExcelに変換する。
+    """APIへ入力された面接1件を、保存せず1シートのExcelに変換する。
 
-    戻り値はメモリ上のExcelデータ。main.pyがHTTPレスポンスとして返す。
+    戻り値はメモリ上のExcelデータであり、ファイルやDBには書き込まない。
     """
 
     # 表形式の出力データはpandasのDataFrameとして組み立てる。
