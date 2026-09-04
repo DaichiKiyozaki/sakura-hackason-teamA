@@ -22,6 +22,7 @@ export default function EvaluationInput() {
     const [questionAnswers, setQuestionAnswers] = useState<QuestionAnswer[]>([]);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [interviewDate, setInterviewDate] = useState("");
+    const [interviewerName, setInterviewerName] = useState("");
     const [candidateName, setCandidateName] = useState(""); 
     const [overallcomment, setOverallComment] = useState("");
     const [isexporting, setIsExporting] = useState(false);
@@ -67,6 +68,7 @@ export default function EvaluationInput() {
             body: JSON.stringify({
                 interviewDate,
                 candidateName,
+                interviewerName,
                 questionAnswers,
                 overallComment: overallcomment,
             }),
@@ -124,6 +126,17 @@ export default function EvaluationInput() {
                     className="w-full rounded-[10px] border border-[#d9e0e3] bg-white px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={candidateName}
                     onChange={(e) => setCandidateName(e.target.value)}
+                />
+            </div>
+            <div>
+                <label className="flex flex-col gap-2">
+                    面接官名
+                </label>
+                <input
+                    type="text"
+                    className="w-full rounded-[10px] border border-[#d9e0e3] bg-white px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={interviewerName}
+                    onChange={(e) => setInterviewerName(e.target.value)}
                 />
             </div>
 
