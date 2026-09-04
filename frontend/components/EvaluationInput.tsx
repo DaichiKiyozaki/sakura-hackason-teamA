@@ -24,14 +24,14 @@ export default function EvaluationInput() {
     const [interviewDate, setInterviewDate] = useState("");
     const [candidateName, setCandidateName] = useState(""); 
     const [overallcomment, setOverallComment] = useState("");
+    const [isexporting, setIsExporting] = useState(false);
     const handleAnalyze = async () => {
         if (!transcript.trim()) {
             alert("文字起こしを入力してください");
             return;
         }
-
-    setIsAnalyzing(true);
-    try {
+        setIsAnalyzing(true);
+        try {
         const response = await fetch("/api/analyze", {
             method: "POST",
             headers: {
@@ -56,6 +56,31 @@ export default function EvaluationInput() {
         setIsAnalyzing(false);
     }
 };
+    const handleExport = async () => {
+        setIsExporting(true);
+    try {
+        const response = await fetch("/api/interviews", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ interviewDate, candidateName, questionAnswers, overallcomment }),
+        });
+        
+        if (!response.ok) {
+            if (response.status === 400) {
+                alert("入力内容を確認してください。");
+            }
+            throw new Error("分析に失敗しました。");
+        }
+
+    } catch (error) {
+        console.error("Error:", error);
+        alert("エラーが発生しました。");
+    } finally {
+        setIsExporting(false);
+    }
+    };
 
     return (
         <main className="w-2/3 mx-auto mt-8 space-y-6">
@@ -124,8 +149,12 @@ export default function EvaluationInput() {
                         />
                     </div>
                     <div className="mt-4">
-                        <button className="rounded-[10px] bg-green-500 px-4 py-2 text-white hover:bg-green-600 mb-4">
-                            評価を保存
+                        <button className="rounded-[10px] bg-green-500 px-4 py-2 text-white hover:bg-green-600 mb-4 justify-center flex"
+                            type ="button"
+                            onClick={handleExport}
+                            disabled={isexporting}
+                        >
+                            {isexporting ? "出力中..." : "Excelに出力"}
                         </button>
                     </div>
                 </div>
