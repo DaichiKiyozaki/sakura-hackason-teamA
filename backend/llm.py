@@ -5,9 +5,9 @@ llm.py
 
 仕様書（mvp-interface-spec.md）4章・5章に準拠。
 - Ollamaの format: json を使用
-- 話者ラベル（面接官: / 応募者:）が両方存在しない場合は 400
+- 話者ラベルがない場合は発言内容から役割を推定
+- 空の文字起こしは 400
 - JSONとして読み取れない場合は1回だけ再実行、それでもダメなら 500
-- タイムアウトは180秒
 """
 
 import json
@@ -16,8 +16,7 @@ import re
 import ollama
 from fastapi import HTTPException
 
-MODEL_NAME = "qwen3:4b"  # 検証済み：think=Falseで3問約1分、精度良好
-TIMEOUT_SECONDS = 180
+MODEL_NAME = "qwen2.5:3b-instruct"  # 日本語の分割・要約とJSON出力に使用する採用モデル
 
 SYSTEM_PROMPT = """あなたは面接の文字起こしを分析するアシスタントです。
 

@@ -1,148 +1,165 @@
 # 面接評価支援システム
 
-## 目的
+新卒採用の一次面接を対象に、文字起こしの整理、回答要約、Excel出力を支援するMVPです。AIは面接内容の整理と要約に使用し、評価や合否は自動で決定しません。
 
-- 面接内容の記録と整理にかかる時間を減らす
-- 面接官が同じ評価基準を使えるようにする
-- 面接内容と評価理由をあとから確認できるようにする
-- 面接内容や評価結果をCSV形式で管理し、面接記録をExcel形式で出力できるようにする
+## 現在の実装
 
-AIは面接内容の整理と要約に使用し、合否を自動で決定しません。
-
-## 作る機能
-
-```text
-面接内容を文字として入力
-        ↓
-質問と回答に分割
-        ↓
-回答を短く要約
-        ↓
-面接官が評価項目ごとに5段階評価
-        ↓
-面接内容と評価のサマリーを表示
-        ↓
-CSV形式で保存
-        ↓
-Excel形式で出力
-```
-
-### 機能一覧
-
-- 面接内容の文字入力
-- 面接官の質問と応募者の回答の分割
+- 面接日、候補者名、面接官名、文字起こしの入力画面
+- 発言内容から面接官と応募者を推定
+- 面接官の質問と応募者の回答への分割
 - 応募者の回答の要約
-- 評価項目ごとの5段階評価
-- 評価理由と所感の入力
-- 面接内容と評価結果のサマリー表示
-- 過去の面接記録との比較
-- CSV形式でのデータ管理
-- Excel形式（`.xlsx`）での面接記録の出力
+- 分割・要約結果の画面表示
+- 入力内容からExcelを直接生成するバックエンドAPI
+
+入力内容はCSVやデータベースへ保存しません。Excelはリクエストごとにメモリ上で生成します。
+
+フロントエンドにはExcel出力リクエストが実装されていますが、返されたファイルを `Blob` としてダウンロードする処理は未実装です。また、画面上の評価点と評価プロセスは現在のExcel出力APIには含まれません。
 
 ## 使用技術
 
 | 分類 | 技術 |
 | --- | --- |
-| フロントエンド | TypeScript |
+| フロントエンド | Next.js 16 / React 19 / TypeScript / Tailwind CSS 4 |
 | バックエンド | Python / FastAPI |
 | ローカルLLM | Ollama |
-| 使用モデル | Qwen3 4B（`qwen3:4b`） |
-| データ管理 | CSV |
-| 出力形式 | Excel（`.xlsx`） |
+| 使用モデル | Qwen2.5 3B Instruct（`qwen2.5:3b-instruct`） |
+| Excel生成 | pandas / openpyxl |
 
 ## システム構成
 
 ```text
-TypeScriptフロントエンド
-        ↓
-FastAPIバックエンド
-        ↓
-Ollama / Qwen3
-        ↓
-質問・回答の分割と回答の要約
-        ↓
-フロントエンドで表示・評価
-        ↓
-CSVへ保存
-        ↓
-Excelファイルを生成・出力
+ブラウザ（localhost:3000）
+        ↓ /api/*
+Next.js
+        ↓ リクエストを転送
+FastAPI（localhost:8000）
+        ├─ Ollama / qwen2.5:3b-instruct
+        │      └─ 質問・回答の分割と回答要約
+        └─ 入力内容からExcelをメモリ上で生成・返却
 ```
 
-## データ管理
+現行のExcel出力APIは入力内容をDBへ保存せず、Excel生成後もサーバー上へファイルを残しません。将来の再利用に備えて、CSVへのDB保存処理自体はバックエンド内に保持しています。
 
-CSVファイルをデータベースとして使用し、次の3ファイルに分けて管理します。各ファイルは `interview_id` で関連付けます。
+## セットアップ
 
-### `interviews.csv`
+Node.js、Python、Ollamaが必要です。以下はWindows PowerShellでの手順です。
 
-面接1回につき1レコードを保存する、面接の基本情報データベースです。
+### 1. Python環境
 
-| 項目 | 内容 |
-| --- | --- |
-| `interview_id` | 面接を識別するID |
-| `interview_date` | 面接日 |
-| `candidate_name` | 応募者名 |
-| `overall_comment` | 面接官の全体所感 |
+リポジトリのルートで実行します。
 
-### `question_answers.csv`
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r backend\requirements.txt
+```
 
-面接中の質問・回答と、AIが生成した回答要約を保存するデータベースです。1つの質問・回答につき1レコードを保存します。
+### 2. Ollamaモデル
 
-| 項目 | 内容 |
-| --- | --- |
-| `interview_id` | 関連する面接のID |
-| `question_no` | 面接内の質問番号 |
-| `question` | 面接官の質問 |
-| `answer` | 応募者の回答 |
-| `answer_summary` | AIが生成した回答の要約 |
+Ollamaを起動してからモデルを取得します。
 
-### `evaluations.csv`
+```powershell
+ollama pull qwen2.5:3b-instruct
+```
 
-面接官が入力した評価項目ごとの点数と理由を保存するデータベースです。1つの評価項目につき1レコードを保存します。
+### 3. バックエンド
 
-| 項目 | 内容 |
-| --- | --- |
-| `interview_id` | 関連する面接のID |
-| `evaluation_item_id` | 評価項目を識別するID |
-| `score` | 5段階の評価点 |
-| `reason` | 評価理由 |
+```powershell
+.\.venv\Scripts\Activate.ps1
+cd backend
+uvicorn main:app --reload
+```
 
-CSVファイルの文字コードにはUTF-8を使用します。
+- API: `http://localhost:8000`
+- Swagger UI: `http://localhost:8000/docs`
+- ヘルスチェック: `http://localhost:8000/health`
+
+### 4. フロントエンド
+
+別のPowerShellで起動します。
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+画面は `http://localhost:3000` で開きます。`/api/*` はNext.jsからFastAPIへ転送されるため、フロントエンドとバックエンドを同時に起動してください。
+
+## API
+
+| メソッド | パス | 内容 |
+| --- | --- | --- |
+| `POST` | `/api/analyze` | 文字起こしを質問・回答へ分割し、回答を要約 |
+| `POST` | `/api/interviews` | 入力内容を保存せず、Excelファイルを返却 |
+| `GET` | `/health` | バックエンドの稼働確認 |
+
+`POST /api/interviews` の入力項目：
+
+- `interviewDate`
+- `candidateName`
+- `interviewerName`
+- `questionAnswers`
+- `overallComment`（任意）
+
+既存フロントとの互換性のため、`overallcomment` も受け付けます。詳しい入出力は [MVPインターフェース仕様書](docs/mvp-interface-spec.md) を参照してください。
 
 ## Excel出力
 
-保存済みの面接記録は、利用者向けのExcelファイル（`.xlsx`）としてダウンロードできます。1回の面接につき1ファイル・1シートで、面接日、応募者名、全体所感、質問、回答要約を出力します。
+入力された面接記録を、1リクエストにつき1つのExcelファイルとして返します。
 
-## 想定する構成
+- 拡張子：`.xlsx`
+- シート名：`面接記録`
+- 出力内容：面接日、候補者名、面接官名、全体所感、質問、回答要約
+- ファイル名例：`面接記録_応募者A_20260903.xlsx`
+
+回答全文、評価点、評価理由はExcelへ出力しません。
+
+## データの扱い
+
+- CSVやデータベースへの保存は行いません。
+- 入力内容はExcel生成中だけメモリ上で扱います。
+- 生成したExcelは `BytesIO` からHTTPレスポンスとして返します。
+- 過去記録の一覧・検索・比較は行いません。
+- `backend/storage.py` と `data/*.csv` は旧CSV処理であり、現行APIからは参照しません。
+
+## テストデータ
+
+`test_data/` に手動確認用データを用意しています。
+
+| ファイル | 用途 |
+| --- | --- |
+| `analyze_transcript.txt` | `面接官:`・`応募者:` 形式の文字起こし |
+| `analyze_transcript_zoom.txt` | 時刻と参加者名だけを含むZoom形式の文字起こし |
+| `export_interview_request.json` | Excel出力APIのリクエスト例 |
+
+DB保存処理とサンプルCSVは将来の再利用に備えて残していますが、現行APIの動作には使用しません。
+
+## ディレクトリ構成
 
 ```text
-project/
-├── frontend/       # TypeScriptフロントエンド
-├── backend/        # FastAPI、Ollamaとの接続処理
-├── data/           # CSVファイル
-├── tests/          # テスト
+sakura-hackathon-teamA/
+├── frontend/                 # Next.jsフロントエンド
+├── backend/
+│   ├── main.py               # 分析API、Excel出力API
+│   ├── llm.py                # Ollamaによる分割・要約
+│   ├── excel.py              # メモリ上でのExcel生成
+│   ├── storage.py            # CSVによるDB処理（現行APIから未使用）
+│   └── requirements.txt
+├── data/                     # CSVデータ（現行APIから未使用）
+├── test_data/                # 手動確認用データ
+├── docs/
+│   └── mvp-interface-spec.md
 └── README.md
 ```
 
-実際のフォルダ構成は、使用するフロントエンドのフレームワークが決まったあとに更新します。
+## 確認
 
-## 開発環境
+バックエンドAPIはSwagger UI（`http://localhost:8000/docs`）から確認できます。フロントエンドの静的チェックは次のコマンドで実行します。
 
-開発に使用する予定のソフトウェアです。
+```powershell
+cd frontend
+npm run lint
+```
 
-- Node.js
-- Python
-- Ollama
-- Git
-
-必要なバージョンとインストール方法は未定です。
-
-## 起動方法
-
-現在準備中です。実装開始後に以下を追記します。
-
-- フロントエンドの初回セットアップ
-- FastAPIの初回セットアップ
-- Ollamaとモデルの準備
-- フロントエンドの起動コマンド
-- バックエンドの起動コマンド
-- テストの実行コマンド
+現在、自動テストスイートはありません。

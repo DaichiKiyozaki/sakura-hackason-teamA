@@ -58,10 +58,11 @@ EVALUATIONS = Table(
 
 # フロントエンドとAPIで共通して使用する評価観点ID。
 EVALUATION_ITEM_IDS = (
-    "logical_thinking",
     "communication",
+    "problem_solving",
+    "logical_thinking",
+    "initiative",
     "collaboration",
-    "enthusiasm",
 )
 
 
