@@ -64,15 +64,30 @@ export default function EvaluationInput() {
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ interviewDate, candidateName, questionAnswers, overallcomment }),
+            body: JSON.stringify({
+                interviewDate,
+                candidateName,
+                questionAnswers,
+                overallComment: overallcomment,
+            }),
         });
         
         if (!response.ok) {
             if (response.status === 400) {
                 alert("入力内容を確認してください。");
             }
-            throw new Error("分析に失敗しました。");
+            throw new Error("Excel出力に失敗しました。");
         }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "interview_results.xlsx";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
 
     } catch (error) {
         console.error("Error:", error);
