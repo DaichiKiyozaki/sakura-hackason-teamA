@@ -76,6 +76,7 @@ class AnalyzeResponse(CamelModel):
 class ExportInterviewRequest(CamelModel):
     interview_date: date
     candidate_name: str = Field(min_length=1)
+    interviewer_name: str = Field(min_length=1)
     question_answers: list[QuestionAnswer] = Field(min_length=1)
     overall_comment: str | None = Field(
         default=None,

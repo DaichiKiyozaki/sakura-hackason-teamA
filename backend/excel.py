@@ -32,6 +32,7 @@ def create_interview_excel(interview: Mapping[str, Any]) -> BytesIO:
         (
             ("面接日", interview["interview_date"]),
             ("候補者名", interview["candidate_name"]),
+            ("面接官名", interview["interviewer_name"]),
             ("全体の所感", interview.get("overall_comment", "")),
         ),
         columns=("項目", "内容"),
