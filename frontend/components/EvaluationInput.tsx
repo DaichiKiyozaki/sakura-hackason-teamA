@@ -131,12 +131,15 @@ export default function EvaluationInput() {
                 <div>
                     <div>
                         <h2 className="mt-4 text-lg font-semibold text-gray-800">
-                            面接メモ
+                            全体の所感
                         </h2>
                         <textarea
                             className="w-full rounded-[10px] border border-[#d9e0e3] bg-white px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             rows={4}
+                            value={overallcomment}
+                            onChange={(e) => setOverallComment(e.target.value)}
                         />
+
                     </div>
                     <h2 className="mt-4 text-lg font-semibold text-gray-800">
                         評価スコア
