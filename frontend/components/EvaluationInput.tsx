@@ -9,14 +9,38 @@ type QuestionAnswer = {
     answerSummary: string;
 };
 
+interface userstate {
+    communication: number;
+    problem_Solving: number;
+    logical_thinking: number;
+    initiative: number;
+    collaboration: number;
+}
+
 export default function EvaluationInput() {
-    const standardScores = [
-        { id : "communication", label: "コミュニケーション能力" },
-        { id : "problem_Solving", label: "問題解決力" },
-        { id : "logical_thinking", label: "論理的思考力" },
-        { id : "initiative", label: "主体性" },
-        { id : "collaboration", label: "協調性" },
+    const [userState, setUserState] = useState<userstate>({
+        communication: 1,
+        problem_Solving: 1,
+        logical_thinking: 1,
+        initiative: 1,
+        collaboration: 1,
+    });
+
+    const handleScoreChange = (id: keyof userstate, value: number) => {
+        setUserState((prev) => ({
+            ...prev,
+            [id]: value
+        }));
+    };
+
+    const standardScores: { id: keyof userstate; label: string }[] = [
+        { id: "communication", label: "コミュニケーション能力" },
+        { id: "problem_Solving", label: "課題解決能力" },
+        { id: "logical_thinking", label: "論理的思考力" },
+        { id: "initiative", label: "主体性" },
+        { id: "collaboration", label: "協調性" },
     ];
+
     const [isTranscriptModalopen, setIsTranscriptModalopen] = useState(false);
     const [transcript, setTranscript] = useState("");
     const [questionAnswers, setQuestionAnswers] = useState<QuestionAnswer[]>([]);
@@ -161,12 +185,21 @@ export default function EvaluationInput() {
                         {standardScores.map((score) => (
                             <div key={score.id} className="flex flex-col gap-2">
                                 <label className="text-gray-700">{score.label}</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="5"
-                                    className="w-full rounded-[10px] border border-[#d9e0e3] bg-white px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                                <div className="flex gap-2">
+                                    {[1, 2, 3, 4, 5].map((value) => (
+                                        <label key={value} className="flex items-center gap-1">
+                                            <input
+                                                type="radio"
+                                                name={score.label}
+                                                value={value}
+                                                checked={userState[score.id] === value}
+                                                onChange={(e) => handleScoreChange(score.id, Number(e.target.value))}
+                                                className="w-full rounded-[10px] border border-[#d9e0e3] bg-white px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            {value}
+                                        </label>
+                                    ))}
+                                </div>
                             </div>
                         ))}
                     </div>
