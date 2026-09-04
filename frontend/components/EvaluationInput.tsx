@@ -129,7 +129,7 @@ export default function EvaluationInput() {
                         </button>
                     </div>
                 </div>
-                <div>
+                <div className="overscroll-y-auto max-h-[600px] overflow-y-auto">
                     <div>
                         <h2 className="mt-4 text-lg font-semibold text-gray-800">
                             文字起こし・要約
@@ -158,24 +158,24 @@ export default function EvaluationInput() {
                                                 質問{item.questionNo}
                                             </p>
                                             <div>
-                                                <p className="text-gray-600">
+                                                <h4 className="semibold text-gray-600">
                                                     質問
-                                                </p>
+                                                </h4>
                                                 <p className="text-gray-800">
                                                     {item.question}
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-gray-600">
+                                                <h4 className="semibold text-gray-600">
                                                     回答
-                                                </p>
+                                                </h4>
                                                 <p className="text-gray-800">
                                                     {item.answer}
                                                 </p>
                                                 <div>
-                                                    <p>
+                                                    <h4 className="semibold text-gray-600">
                                                         要約
-                                                    </p>
+                                                    </h4>
                                                     <p className="text-gray-800">
                                                         {item.answerSummary}
                                                     </p>
