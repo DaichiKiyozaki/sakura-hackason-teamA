@@ -154,28 +154,28 @@ export default function EvaluationInput() {
                                 ) : (
                                     questionAnswers.map((item) => (
                                         <div key={item.questionNo} className="mt-2">
-                                            <p className="font-semibold text-gray-800">
+                                            <p className="font-semibold text-gray-800 mt-3">
                                                 質問{item.questionNo}
                                             </p>
                                             <div>
-                                                <h4 className="semibold text-gray-600">
-                                                    質問
-                                                </h4>
+                                                <h2 className="font-semibold text-gray-600">
+                                                    【質問】
+                                                </h2>
                                                 <p className="text-gray-800">
                                                     {item.question}
                                                 </p>
                                             </div>
                                             <div>
-                                                <h4 className="semibold text-gray-600">
-                                                    回答
-                                                </h4>
+                                                <h2 className="font-semibold text-gray-600 mt-2">
+                                                    【回答】
+                                                </h2>
                                                 <p className="text-gray-800">
                                                     {item.answer}
                                                 </p>
                                                 <div>
-                                                    <h4 className="semibold text-gray-600">
-                                                        要約
-                                                    </h4>
+                                                    <h2 className="font-semibold text-gray-600 mt-2">
+                                                        【要約】
+                                                    </h2>
                                                     <p className="text-gray-800">
                                                         {item.answerSummary}
                                                     </p>
